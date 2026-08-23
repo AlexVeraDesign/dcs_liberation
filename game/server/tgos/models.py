@@ -36,10 +36,11 @@ class TgoJs(BaseModel):
         if isinstance(tgo, CsarTarget):
             tgo._ensure_survivors()
             tgo.refresh_name()
+            squadrons = sorted({survivor.squadron_name for survivor in tgo.survivors})
             return TgoJs(
                 id=tgo.id,
                 name=tgo.name,
-                control_point_name=tgo.survivors[0].base_name,
+                control_point_name=", ".join(squadrons),
                 category=tgo.category,
                 blue=tgo.squadron.player,
                 position=LeafletPoint.from_pydcs(tgo.position),

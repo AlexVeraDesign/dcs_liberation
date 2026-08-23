@@ -10,7 +10,9 @@ from dcs.terrain import Caucasus
 from game.ato import FlightType
 from game.csar import CsarManager, CsarResolution, CsarTarget
 from game.db.gamedb import GameDb
+from game.server.tgos.models import TgoJs
 from game.squadrons.pilot import Pilot, PilotStatus
+from game.squadrons.squadron import Squadron
 from game.unitmap import FlyingUnit
 
 
@@ -39,11 +41,15 @@ class FakeTheater:
 
 @dataclass
 class FakeSquadron:
+    name: str = "Fake Squadron"
     player: bool = True
     available_pilots: list[Pilot] = field(default_factory=list)
     location: FakeControlPoint = field(
         default_factory=lambda: FakeControlPoint("Home", point(0, 0), True)
     )
+
+    def __str__(self) -> str:
+        return self.name
 
 
 def game_with_cps(*cps: FakeControlPoint, sea: bool = False) -> SimpleNamespace:
@@ -121,15 +127,17 @@ def test_overlapping_cp_radii_choose_nearest() -> None:
 
 def test_deep_enemy_territory_outside_cp_radii_creates_csar() -> None:
     pilot = Pilot("Pilot")
+    squadron = FakeSquadron(available_pilots=[pilot])
     game = game_with_cps(FakeControlPoint("Enemy", point(100000, 0), False))
     manager = CsarManager()
 
     target = manager.add_aircraft_survivor(
-        game, flying_unit(pilot, FakeSquadron()), point(0, 0)
+        game, flying_unit(pilot, squadron), point(0, 0)
     )
 
     assert target is not None
     assert pilot.status is PilotStatus.MIA
+    assert pilot not in squadron.available_pilots
     assert target in manager.targets
 
 
@@ -235,6 +243,29 @@ def test_csar_grouping_uses_connected_components() -> None:
     assert manager.targets[0].position.x == eight_nm
 
 
+def test_csar_map_label_uses_squadrons_not_bases() -> None:
+    game = game_with_cps()
+    manager = CsarManager()
+    lhd_squadron = FakeSquadron(
+        name="LHD Squadron",
+        location=FakeControlPoint("Juan Carlos I", point(0, 0), True),
+    )
+    vaziani_squadron = FakeSquadron(
+        name="Vaziani Squadron", location=FakeControlPoint("Vaziani", point(0, 0), True)
+    )
+
+    target = manager.add_aircraft_survivor(
+        game, flying_unit(Pilot("Pilot A"), lhd_squadron), point(0, 0)
+    )
+    manager.add_aircraft_survivor(
+        game, flying_unit(Pilot("Pilot B"), vaziani_squadron), point(1000, 0)
+    )
+
+    assert target is not None
+    tgo = TgoJs.for_tgo(target)
+    assert tgo.control_point_name == "LHD Squadron, Vaziani Squadron"
+
+
 def test_land_csar_expiration_kills_pilot() -> None:
     pilot = Pilot("Pilot")
     game = game_with_cps()
@@ -244,6 +275,13 @@ def test_land_csar_expiration_kills_pilot() -> None:
     manager.targets.append(target)
     game.db.tgos.add(target.id, target)
     game.turn = 8
+
+    manager.process_turn(game)
+
+    assert pilot.status is PilotStatus.MIA
+    assert target in manager.targets
+
+    game.turn = 9
 
     manager.process_turn(game)
 
@@ -263,7 +301,35 @@ def test_sea_csar_expiration_kills_pilot() -> None:
 
     manager.process_turn(game)
 
+    assert pilot.status is PilotStatus.MIA
+    assert target in manager.targets
+
+    game.turn = 2
+
+    manager.process_turn(game)
+
     assert pilot.status is PilotStatus.Dead
+
+
+def test_turns_remaining_include_first_playable_turn() -> None:
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(0, 0), 18, sea=False)
+
+    assert target.turns_remaining(19) == 8
+    assert target.turns_remaining(20) == 7
+
+
+def test_mia_pilots_do_not_open_replenishment_slots() -> None:
+    active_pilots = [Pilot(f"Active {idx}") for idx in range(3)]
+    mia_pilot = Pilot("MIA Pilot", status=PilotStatus.MIA)
+    squadron = object.__new__(Squadron)
+    squadron.current_roster = [*active_pilots, mia_pilot]
+    squadron.settings = SimpleNamespace(
+        enable_squadron_pilot_limits=True,
+        squadron_pilot_limit=4,
+        squadron_replenishment_rate=1,
+    )
+
+    assert squadron.replenish_count == 0
 
 
 def test_pickup_alive_recovers_pilot() -> None:
