@@ -41,8 +41,12 @@ export default function Tgo(props: TgoProps) {
     >
       <Tooltip>
         {`${props.tgo.name} (${props.tgo.control_point_name})`}
-        <br />
-        <SplitLines items={props.tgo.units} />
+        {props.tgo.units.length > 0 && (
+          <>
+            <br />
+            <SplitLines items={props.tgo.units} />
+          </>
+        )}
       </Tooltip>
     </Marker>
   );

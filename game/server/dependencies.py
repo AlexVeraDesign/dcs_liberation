@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, TYPE_CHECKING
 
+from game.csar import CsarTarget
 from game.theater import ControlPoint, MissionTarget, TheaterGroundObject
 
 if TYPE_CHECKING:
@@ -37,11 +38,13 @@ class QtCallbacks:
         self,
         create_new_package: Callable[[MissionTarget], None],
         show_tgo_info: Callable[[TheaterGroundObject], None],
+        show_csar_info: Callable[[CsarTarget], None],
         show_control_point_info: Callable[[ControlPoint], None],
         select_flight: Callable[[Flight], None],
     ) -> None:
         self.create_new_package = create_new_package
         self.show_tgo_info = show_tgo_info
+        self.show_csar_info = show_csar_info
         self.show_control_point_info = show_control_point_info
         self.select_flight = select_flight
 

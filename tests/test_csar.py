@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from types import SimpleNamespace
 
 from dcs.mapping import Point
@@ -48,13 +49,16 @@ class FakeSquadron:
 def game_with_cps(*cps: FakeControlPoint, sea: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
         turn=0,
+        simulation_time=datetime(2026, 8, 23, 12, 0),
         theater=FakeTheater(list(cps), sea=sea),
         db=GameDb(),
+        point_in_world=lambda x, y: point(x, y),
         settings=SimpleNamespace(
             invulnerable_player_pilots=False,
-            csar_friendly_recovery_radius=10,
-            csar_enemy_capture_radius=10,
+            csar_friendly_recovery_radius=20,
+            csar_enemy_capture_radius=20,
             csar_pickup_radius=300,
+            csar_grouping_radius=10,
         ),
     )
 
@@ -129,6 +133,36 @@ def test_deep_enemy_territory_outside_cp_radii_creates_csar() -> None:
     assert target in manager.targets
 
 
+def test_enemy_aircraft_survivor_does_not_create_csar_target() -> None:
+    pilot = Pilot("Enemy")
+    squadron = FakeSquadron(player=False)
+    game = game_with_cps()
+    manager = CsarManager()
+
+    target = manager.add_aircraft_survivor(
+        game, flying_unit(pilot, squadron), point(0, 0)
+    )
+
+    assert target is None
+    assert pilot.status is PilotStatus.Dead
+    assert manager.targets == []
+
+
+def test_enemy_helicopter_loss_does_not_create_csar_target() -> None:
+    pilot = Pilot("Enemy")
+    squadron = FakeSquadron(player=False)
+    game = game_with_cps()
+    manager = CsarManager()
+
+    target = manager.add_helicopter_loss(
+        game, flying_unit(pilot, squadron), point(0, 0)
+    )
+
+    assert target is None
+    assert pilot.status is PilotStatus.Dead
+    assert manager.targets == []
+
+
 def test_configured_friendly_recovery_radius_is_respected() -> None:
     pilot = Pilot("Pilot")
     game = game_with_cps(FakeControlPoint("Friendly", point(0, 0), True))
@@ -155,6 +189,50 @@ def test_configured_enemy_capture_radius_is_respected() -> None:
 
     assert target is not None
     assert pilot.status is PilotStatus.MIA
+
+
+def test_nearby_csar_targets_are_grouped_at_center_point() -> None:
+    game = game_with_cps()
+    manager = CsarManager()
+    squadron = FakeSquadron()
+    first = Pilot("Pilot A")
+    second = Pilot("Pilot B")
+
+    first_target = manager.add_aircraft_survivor(
+        game, flying_unit(first, squadron), point(0, 0)
+    )
+    second_target = manager.add_aircraft_survivor(
+        game, flying_unit(second, squadron), point(1000, 0)
+    )
+
+    assert first_target is not None
+    assert second_target is first_target
+    assert len(manager.targets) == 1
+    assert len(first_target.survivors) == 2
+    assert first_target.position.x == 500
+    assert first_target.position.y == 0
+    assert first_target.name == "CSAR: 2 pilots"
+
+
+def test_csar_grouping_uses_connected_components() -> None:
+    game = game_with_cps()
+    manager = CsarManager()
+    squadron = FakeSquadron()
+    eight_nm = 8 * 1852
+
+    manager.add_aircraft_survivor(
+        game, flying_unit(Pilot("Pilot A"), squadron), point(0, 0)
+    )
+    manager.add_aircraft_survivor(
+        game, flying_unit(Pilot("Pilot B"), squadron), point(eight_nm, 0)
+    )
+    manager.add_aircraft_survivor(
+        game, flying_unit(Pilot("Pilot C"), squadron), point(eight_nm * 2, 0)
+    )
+
+    assert len(manager.targets) == 1
+    assert len(manager.targets[0].survivors) == 3
+    assert manager.targets[0].position.x == eight_nm
 
 
 def test_land_csar_expiration_kills_pilot() -> None:
