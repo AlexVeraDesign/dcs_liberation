@@ -27,10 +27,11 @@ class Formation(WaypointOption, Enum):
                 action = action.__dict__
             return action.get("params", {})
 
-        if not isinstance(value, dict):
+        try:
+            params = option_params(value)
+        except AttributeError:
             return None
 
-        params = option_params(value)
         for formation in cls:
             formation_params = option_params(formation.value)
             if (
