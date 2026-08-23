@@ -34,14 +34,20 @@ class TgoJs(BaseModel):
         from game.csar import CsarTarget
 
         if isinstance(tgo, CsarTarget):
+            tgo._ensure_survivors()
+            tgo.refresh_name()
             return TgoJs(
                 id=tgo.id,
                 name=tgo.name,
-                control_point_name=tgo.squadron.location.name,
+                control_point_name=tgo.survivors[0].base_name,
                 category=tgo.category,
                 blue=tgo.squadron.player,
                 position=LeafletPoint.from_pydcs(tgo.position),
-                units=[tgo.pilot.name],
+                units=(
+                    [s.pilot.name for s in tgo.survivors]
+                    if len(tgo.survivors) > 1
+                    else []
+                ),
                 threat_ranges=[],
                 detection_ranges=[],
                 dead=False,

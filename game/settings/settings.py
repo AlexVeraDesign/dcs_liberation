@@ -491,7 +491,7 @@ class Settings:
         "CSAR friendly automatic recovery radius (NM)",
         page=MISSION_GENERATOR_PAGE,
         section=GAMEPLAY_SECTION,
-        default=10,
+        default=20,
         min=0,
         max=100,
         detail=(
@@ -503,7 +503,7 @@ class Settings:
         "CSAR enemy automatic capture radius (NM)",
         page=MISSION_GENERATOR_PAGE,
         section=GAMEPLAY_SECTION,
-        default=10,
+        default=20,
         min=0,
         max=100,
         detail=(
@@ -521,6 +521,18 @@ class Settings:
         detail=(
             "Maximum distance from the downed pilot for a landed CSAR helicopter "
             "to complete the pickup in the generated DCS mission."
+        ),
+    )
+    csar_grouping_radius: int = bounded_int_option(
+        "CSAR grouping radius (NM)",
+        page=MISSION_GENERATOR_PAGE,
+        section=GAMEPLAY_SECTION,
+        default=10,
+        min=0,
+        max=100,
+        detail=(
+            "New CSAR incidents within this distance of an existing CSAR incident "
+            "are grouped into a single rescue mission."
         ),
     )
 

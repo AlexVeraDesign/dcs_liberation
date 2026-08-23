@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from game import Game
+from game.csar import CsarTarget
 from ..dependencies import GameContext, QtCallbacks, QtContext
 
 router: APIRouter = APIRouter(prefix="/qt")
@@ -45,7 +46,9 @@ def show_tgo_info(
     qt: QtCallbacks = Depends(QtContext.get),
 ) -> None:
     target = game.db.tgos.get(tgo_id)
-    if hasattr(target, "groups"):
+    if isinstance(target, CsarTarget):
+        qt.show_csar_info(target)
+    elif hasattr(target, "groups"):
         qt.show_tgo_info(target)
 
 

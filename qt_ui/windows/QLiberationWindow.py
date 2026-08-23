@@ -42,6 +42,7 @@ from qt_ui.windows.BugReportDialog import BugReportDialog
 from qt_ui.windows.GameUpdateSignal import GameUpdateSignal
 from qt_ui.windows.PendingTransfersDialog import PendingTransfersDialog
 from qt_ui.windows.QDebriefingWindow import QDebriefingWindow
+from qt_ui.windows.QCsarInfoDialog import QCsarInfoDialog
 from qt_ui.windows.basemenu.QBaseMenu2 import QBaseMenu2
 from qt_ui.windows.gameoverdialog import GameOverDialog
 from qt_ui.windows.groundobject.QGroundObjectMenu import QGroundObjectMenu
@@ -54,11 +55,13 @@ from qt_ui.windows.preferences.QLiberationPreferencesWindow import (
 )
 from qt_ui.windows.settings.QSettingsWindow import QSettingsWindow
 from qt_ui.windows.stats.QStatsWindow import QStatsWindow
+from game.csar import CsarTarget
 
 
 class QLiberationWindow(QMainWindow):
     new_package_signal = Signal(MissionTarget)
     tgo_info_signal = Signal(TheaterGroundObject)
+    csar_info_signal = Signal(CsarTarget)
     control_point_info_signal = Signal(ControlPoint)
     select_flight_signal = Signal(Flight)
 
@@ -76,12 +79,14 @@ class QLiberationWindow(QMainWindow):
             lambda target: Dialog.open_new_package_dialog(target, self)
         )
         self.tgo_info_signal.connect(self.open_tgo_info_dialog)
+        self.csar_info_signal.connect(self.open_csar_info_dialog)
         self.control_point_info_signal.connect(self.open_control_point_info_dialog)
         self.select_flight_signal.connect(self.on_select_flight)
         QtContext.set_callbacks(
             QtCallbacks(
                 lambda target: self.new_package_signal.emit(target),
                 lambda tgo: self.tgo_info_signal.emit(tgo),
+                lambda target: self.csar_info_signal.emit(target),
                 lambda cp: self.control_point_info_signal.emit(cp),
                 lambda flight: self.select_flight_signal.emit(flight),
             )
@@ -585,6 +590,10 @@ class QLiberationWindow(QMainWindow):
 
     def open_tgo_info_dialog(self, tgo: TheaterGroundObject) -> None:
         QGroundObjectMenu(self, tgo, tgo.control_point, self.game).show()
+
+    def open_csar_info_dialog(self, target: CsarTarget) -> None:
+        self._csar_dialog = QCsarInfoDialog(self, target, self.game)
+        self._csar_dialog.show()
 
     def open_control_point_info_dialog(self, cp: ControlPoint) -> None:
         self._cp_dialog = QBaseMenu2(None, cp, self.game_model)
