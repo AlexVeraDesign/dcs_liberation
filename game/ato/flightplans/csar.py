@@ -14,6 +14,8 @@ from .waypointbuilder import WaypointBuilder
 from ..flightwaypoint import FlightWaypointType
 
 if TYPE_CHECKING:
+    from dcs.mapping import Point
+
     from ..flightwaypoint import FlightWaypoint
 
 
@@ -79,23 +81,23 @@ class Builder(IBuilder[CsarFlightPlan, CsarLayout]):
     def layout(self) -> CsarLayout:
         if not self.flight.is_helo or self.flight.squadron.aircraft.cabin_size <= 0:
             raise PlanningError("CSAR requires a transport-capable helicopter")
-        assert self.package.waypoints is not None
 
         altitude = self.doctrine.helicopter.air_assault_nav_altitude
         builder = WaypointBuilder(self.flight, self.coalition)
         pickup = builder.csar_pickup_zone(self.package.target)
+        ingress_position = self.ingress_position()
 
         return CsarLayout(
             departure=builder.takeoff(self.flight.departure),
             nav_to_pickup=builder.nav_path(
                 self.flight.departure.position,
-                self.package.waypoints.ingress,
+                ingress_position,
                 altitude,
                 altitude_is_agl=True,
             ),
             ingress=builder.ingress(
                 FlightWaypointType.INGRESS_AIR_ASSAULT,
-                self.package.waypoints.ingress,
+                ingress_position,
                 self.package.target,
             ),
             pickup=pickup,
@@ -109,6 +111,16 @@ class Builder(IBuilder[CsarFlightPlan, CsarLayout]):
             divert=builder.divert(self.flight.divert),
             bullseye=builder.bullseye(),
         )
+
+    def ingress_position(self) -> Point:
+        if self.package.waypoints is not None:
+            return self.package.waypoints.ingress
+
+        target = self.package.target.position
+        heading_to_departure = target.heading_between_point(
+            self.flight.departure.position
+        )
+        return target.point_from_heading(heading_to_departure, 2000)
 
     def build(self, dump_debug_info: bool = False) -> CsarFlightPlan:
         return CsarFlightPlan(self.flight, self.layout())
