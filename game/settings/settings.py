@@ -473,6 +473,42 @@ class Settings:
             "and other flights have their TOTs."
         ),
     )
+    csar_friendly_recovery_radius: int = bounded_int_option(
+        "CSAR friendly automatic recovery radius (NM)",
+        page=MISSION_GENERATOR_PAGE,
+        section=GAMEPLAY_SECTION,
+        default=10,
+        min=0,
+        max=100,
+        detail=(
+            "Downed pilots within this distance of a friendly airbase, carrier, "
+            "LHA/LHD, or other control point are recovered automatically."
+        ),
+    )
+    csar_enemy_capture_radius: int = bounded_int_option(
+        "CSAR enemy automatic capture radius (NM)",
+        page=MISSION_GENERATOR_PAGE,
+        section=GAMEPLAY_SECTION,
+        default=10,
+        min=0,
+        max=100,
+        detail=(
+            "Downed pilots within this distance of an enemy airbase, carrier, "
+            "LHA/LHD, or other control point are captured automatically."
+        ),
+    )
+    csar_pickup_radius: int = bounded_int_option(
+        "CSAR pickup radius (meters)",
+        page=MISSION_GENERATOR_PAGE,
+        section=GAMEPLAY_SECTION,
+        default=300,
+        min=50,
+        max=2000,
+        detail=(
+            "Maximum distance from the downed pilot for a landed CSAR helicopter "
+            "to complete the pickup in the generated DCS mission."
+        ),
+    )
 
     # Performance
     perf_smoke_gen: bool = boolean_option(

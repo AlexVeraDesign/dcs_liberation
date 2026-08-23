@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
 CSAR_RECOVERY_RADIUS: Distance = nautical_miles(10)
 CSAR_CAPTURE_RADIUS: Distance = nautical_miles(10)
+CSAR_PICKUP_RADIUS_METERS = 300
 CSAR_LAND_LIFETIME_TURNS = 8
 CSAR_SEA_LIFETIME_TURNS = 1
 CSAR_HELICOPTER_SURVIVAL_CHANCE = 0.20
-CSAR_PICKUP_RADIUS: Distance = nautical_miles(0.1)
 
 
 class CsarResolution(Enum):
@@ -168,14 +168,28 @@ class CsarManager:
     ) -> CsarResolution:
         friendly: tuple[float, object] | None = None
         enemy: tuple[float, object] | None = None
+        recovery_radius = nautical_miles(
+            getattr(
+                game.settings,
+                "csar_friendly_recovery_radius",
+                CSAR_RECOVERY_RADIUS.nautical_miles,
+            )
+        )
+        capture_radius = nautical_miles(
+            getattr(
+                game.settings,
+                "csar_enemy_capture_radius",
+                CSAR_CAPTURE_RADIUS.nautical_miles,
+            )
+        )
         for cp in game.theater.controlpoints:
             distance = target.position.distance_to_point(cp.position)
             if cp.is_friendly(target.squadron.player):
-                if distance <= CSAR_RECOVERY_RADIUS.meters and (
+                if distance <= recovery_radius.meters and (
                     friendly is None or distance < friendly[0]
                 ):
                     friendly = (distance, cp)
-            elif distance <= CSAR_CAPTURE_RADIUS.meters and (
+            elif distance <= capture_radius.meters and (
                 enemy is None or distance < enemy[0]
             ):
                 enemy = (distance, cp)
