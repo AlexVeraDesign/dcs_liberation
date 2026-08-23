@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Iterator, TYPE_CHECKING, Type
 
 from game.ato.flightplans.standard import StandardFlightPlan, StandardLayout
+from game.csar import CSAR_PICKUP_RADIUS_METERS
 from game.utils import Distance, meters
 from .ibuilder import IBuilder
 from .planningerror import PlanningError
@@ -54,7 +55,13 @@ class CsarFlightPlan(StandardFlightPlan[CsarLayout], UiZoneDisplay):
 
     @property
     def pickup_zone_radius(self) -> Distance:
-        return meters(300)
+        return meters(
+            getattr(
+                self.flight.coalition.game.settings,
+                "csar_pickup_radius",
+                CSAR_PICKUP_RADIUS_METERS,
+            )
+        )
 
     @property
     def mission_begin_on_station_time(self) -> datetime | None:
