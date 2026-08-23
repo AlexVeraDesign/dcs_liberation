@@ -104,6 +104,13 @@ class UnitHitpointUpdate(ABC):
     ) -> Optional[UnitHitpointUpdate]:
         raise NotImplementedError()
 
+    def is_dead(self) -> bool:
+        # Use hit_points > 1 to indicate unit is alive, rather than >=1 (DCS logic) to account for uncontrolled units which often have a
+        # health floor of 1
+        if self.hit_points > 1:
+            return False
+        return True
+
 
 @dataclass(frozen=True)
 class AircraftPositionEvent:
@@ -116,13 +123,6 @@ class AircraftPositionEvent:
             unit_name=str(data["name"]),
             position=game.point_in_world(float(data["x"]), float(data["z"])),
         )
-
-    def is_dead(self) -> bool:
-        # Use hit_points > 1 to indicate unit is alive, rather than >=1 (DCS logic) to account for uncontrolled units which often have a
-        # health floor of 1
-        if self.hit_points > 1:
-            return False
-        return True
 
     def is_friendly(self, to_player: bool) -> bool:
         raise NotImplementedError()
