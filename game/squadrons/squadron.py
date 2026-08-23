@@ -227,6 +227,10 @@ class Squadron:
         return self._pilots_with_status(PilotStatus.OnLeave)
 
     @property
+    def pilots_mia(self) -> list[Pilot]:
+        return self._pilots_with_status(PilotStatus.MIA)
+
+    @property
     def number_of_pilots_including_inactive(self) -> int:
         return len(self.current_roster)
 

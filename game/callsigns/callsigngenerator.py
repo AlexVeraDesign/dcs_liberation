@@ -163,6 +163,7 @@ class FlightTypeNameAllocator:
         FlightType.DEAD: 4,
         FlightType.ESCORT: 5,
         FlightType.AIR_ASSAULT: 6,
+        FlightType.CSAR: 6,
         FlightType.TRANSPORT: 7,
         FlightType.FERRY: 7,
     }

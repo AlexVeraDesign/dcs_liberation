@@ -14,6 +14,9 @@ base_capture_events = {}
 destroyed_objects_positions = {} -- will be added via S_EVENT_DEAD event
 killed_ground_units = {} -- keep track of static ground object deaths
 unit_hit_point_updates = {} -- stores updates to unit hit points, triggered by S_EVENT_HIT
+ejection_events = {} -- stores aircraft ejection positions from S_EVENT_EJECTION
+aircraft_loss_positions = {} -- stores aircraft loss positions from loss/death events
+csar_pickups = {} -- stores successful CSAR pickup events
 mission_ended = false
 
 local function ends_with(str, ending)
@@ -49,6 +52,9 @@ function write_state()
         ["destroyed_objects_positions"] = destroyed_objects_positions,
 		["killed_ground_units"] = killed_ground_units,
 		["unit_hit_point_updates"] = unit_hit_point_updates,
+        ["ejection_events"] = ejection_events,
+        ["aircraft_loss_positions"] = aircraft_loss_positions,
+        ["csar_pickups"] = csar_pickups,
 		["simulation_time_seconds"] = simulation_time_seconds
     }
     if not json then
@@ -167,17 +173,38 @@ function update_hit_points(event)
 end 
 
 activeWeapons = {}
+local function recordAircraftPosition(event, target_table)
+    if not event.initiator then
+        return
+    end
+    get_name_success, unit_name = pcall(event.initiator.getName, event.initiator)
+    if not get_name_success then
+        return
+    end
+    get_position_success, position = pcall(event.initiator.getPosition, event.initiator)
+    if not get_position_success then
+        return
+    end
+    local aircraft_position = {}
+    aircraft_position.name = unit_name
+    aircraft_position.x = position.p.x
+    aircraft_position.z = position.p.z
+    target_table[#target_table + 1] = aircraft_position
+end
+
 local function onEvent(event)
 
 	simulation_time_seconds = event.time
 
     if event.id == world.event.S_EVENT_CRASH and event.initiator then
         crash_events[#crash_events + 1] = event.initiator.getName(event.initiator)
+        recordAircraftPosition(event, aircraft_loss_positions)
         write_state()
     end
    
     if event.id == world.event.S_EVENT_UNIT_LOST and event.initiator then
         unit_lost_events[#unit_lost_events + 1] = event.initiator.getName(event.initiator)
+        recordAircraftPosition(event, aircraft_loss_positions)
         write_state()
     end
 	
@@ -190,6 +217,7 @@ local function onEvent(event)
 	    get_initiator_name_success, initiator_name = pcall(event.initiator.getName, event.initiator)
 		if get_initiator_name_success then
 			dead_events[#dead_events + 1] = event.initiator.getName(event.initiator)
+            recordAircraftPosition(event, aircraft_loss_positions)
 			local position = event.initiator.getPosition(event.initiator)
 			local destruction = {}
 			destruction.x = position.p.x
@@ -200,6 +228,11 @@ local function onEvent(event)
 			destroyed_objects_positions[#destroyed_objects_positions + 1] = destruction
 			write_state()
 		end
+    end
+
+    if event.id == world.event.S_EVENT_EJECTION and event.initiator then
+        recordAircraftPosition(event, ejection_events)
+        write_state()
     end
 	
 	if event.id == world.event.S_EVENT_HIT then

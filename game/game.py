@@ -22,6 +22,7 @@ from . import naming
 from .ato.flighttype import FlightType
 from .campaignloader import CampaignAirWingConfig
 from .coalition import Coalition
+from .csar import CsarManager
 from .db.gamedb import GameDb
 from .infos.information import Information
 from .lasercodes.lasercoderegistry import LaserCodeRegistry
@@ -116,6 +117,7 @@ class Game:
         self.laser_code_registry = LaserCodeRegistry()
 
         self.db = GameDb()
+        self.csar = CsarManager()
 
         if start_time is None:
             self.time_of_day_offset_for_start_time = list(TimeOfDay).index(
@@ -224,6 +226,11 @@ class Game:
 
         if not hasattr(self, "name_generator"):
             self.name_generator = naming.namegen
+        if not hasattr(self, "csar"):
+            self.csar = CsarManager()
+        for csar_target in self.csar.targets:
+            if csar_target.id not in self.db.tgos.objects:
+                self.db.tgos.add(csar_target.id, csar_target)
         # Hack: Replace the global name generator state with the state from the save
         # game.
         #
@@ -285,6 +292,8 @@ class Game:
         for control_point in self.theater.controlpoints:
             control_point.process_turn(self)
 
+        self.csar.process_turn(self)
+
         if not skipped:
             for cp in self.theater.player_points():
                 for front_line in cp.front_lines.values():
@@ -310,6 +319,9 @@ class Game:
             control_point.initialize_turn_0(self.laser_code_registry)
             for tgo in control_point.connected_objectives:
                 self.db.tgos.add(tgo.id, tgo)
+        for csar_target in self.csar.targets:
+            if csar_target.id not in self.db.tgos.objects:
+                self.db.tgos.add(csar_target.id, csar_target)
 
         # Correct the heading of specifc TGOs, can only be done after init turn 0
         for tgo in self.theater.ground_objects:

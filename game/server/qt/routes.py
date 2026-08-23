@@ -44,7 +44,9 @@ def show_tgo_info(
     game: Game = Depends(GameContext.require),
     qt: QtCallbacks = Depends(QtContext.get),
 ) -> None:
-    qt.show_tgo_info(game.db.tgos.get(tgo_id))
+    target = game.db.tgos.get(tgo_id)
+    if hasattr(target, "groups"):
+        qt.show_tgo_info(target)
 
 
 @router.post(

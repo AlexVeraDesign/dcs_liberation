@@ -176,6 +176,7 @@ class Package:
             FlightType.DEAD,
             FlightType.TRANSPORT,
             FlightType.AIR_ASSAULT,
+            FlightType.CSAR,
             FlightType.SEAD,
             FlightType.TARCAP,
             FlightType.BARCAP,

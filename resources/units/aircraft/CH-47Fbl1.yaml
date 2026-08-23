@@ -30,4 +30,5 @@ radios:
 tasks:
   Air Assault: 120
   Transport: 110
+  CSAR: 110
 hit_points: 58

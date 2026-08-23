@@ -57,6 +57,7 @@ class FlightType(Enum):
     REFUELING = "Refueling"
     FERRY = "Ferry"
     AIR_ASSAULT = "Air Assault"
+    CSAR = "CSAR"
     IDLE = "Idle"
 
     def __str__(self) -> str:
@@ -92,6 +93,7 @@ class FlightType(Enum):
             FlightType.OCA_AIRCRAFT,
             FlightType.SEAD_ESCORT,
             FlightType.AIR_ASSAULT,
+            FlightType.CSAR,
         }
 
     @property
@@ -116,4 +118,5 @@ class FlightType(Enum):
             FlightType.TARCAP: AirEntity.FIGHTER,
             FlightType.TRANSPORT: AirEntity.UTILITY,
             FlightType.AIR_ASSAULT: AirEntity.ROTARY_WING,
+            FlightType.CSAR: AirEntity.COMBAT_SEARCH_AND_RESCUE,
         }.get(self, AirEntity.UNSPECIFIED)

@@ -224,6 +224,10 @@ class SquadronDialog(QDialog):
             button.setDisabled(True)
             return True
         pilot = self.squadron_model.pilot_at_index(index)
+        if pilot.mia:
+            button.setText("Pilot is MIA")
+            button.setDisabled(True)
+            return True
         if not pilot.alive:
             button.setText("Pilot is dead")
             button.setDisabled(True)

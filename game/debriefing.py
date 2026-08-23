@@ -15,6 +15,8 @@ from typing import (
 )
 from uuid import UUID
 
+from dcs.mapping import Point
+
 from game.dcs.aircrafttype import AircraftType
 from game.dcs.groundunittype import GroundUnitType
 from game.theater import Airfield, ControlPoint
@@ -101,6 +103,19 @@ class UnitHitpointUpdate(ABC):
         cls, data: dict[str, Any], unit_map: UnitMap
     ) -> Optional[UnitHitpointUpdate]:
         raise NotImplementedError()
+
+
+@dataclass(frozen=True)
+class AircraftPositionEvent:
+    unit_name: str
+    position: Point
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any], game: Game) -> AircraftPositionEvent:
+        return cls(
+            unit_name=str(data["name"]),
+            position=game.point_in_world(float(data["x"]), float(data["z"])),
+        )
 
     def is_dead(self) -> bool:
         # Use hit_points > 1 to indicate unit is alive, rather than >=1 (DCS logic) to account for uncontrolled units which often have a
@@ -213,6 +228,15 @@ class StateData:
     # {"name": "<damaged unit name>", "hit_points": <hit points as float>}
     unit_hit_point_updates: List[dict[str, Any]]
 
+    #: Aircraft ejection positions. Format: {"name": unit name, "x": x, "z": z}
+    ejection_events: List[dict[str, Any]]
+
+    #: Aircraft loss positions. Format: {"name": unit name, "x": x, "z": z}
+    aircraft_loss_positions: List[dict[str, Any]]
+
+    #: Successful CSAR pickups. Format: {"target_id": UUID, "unit": unit name}
+    csar_pickups: List[dict[str, Any]]
+
     @classmethod
     def from_json(cls, data: Dict[str, Any], unit_map: UnitMap) -> StateData:
         def clean_unit_list(unit_list: List[Any]) -> List[str]:
@@ -254,6 +278,9 @@ class StateData:
             destroyed_statics=data["destroyed_objects_positions"],
             base_capture_events=data["base_capture_events"],
             unit_hit_point_updates=data["unit_hit_point_updates"],
+            ejection_events=data.get("ejection_events", []),
+            aircraft_loss_positions=data.get("aircraft_loss_positions", []),
+            csar_pickups=data.get("csar_pickups", []),
         )
 
 
@@ -271,6 +298,13 @@ class Debriefing:
         self.air_losses = self.dead_aircraft()
         self.ground_losses = self.dead_ground_units()
         self.base_captures = self.base_capture_events()
+        self.ejection_events = self.aircraft_position_events(
+            self.state_data.ejection_events
+        )
+        self.aircraft_loss_positions = self.aircraft_position_events(
+            self.state_data.aircraft_loss_positions
+        )
+        self.csar_pickups = self.csar_pickup_events()
 
     def merge_simulation_results(self, results: SimulationResults) -> None:
         for air_loss in results.air_losses:
@@ -411,6 +445,26 @@ class Debriefing:
                 else:
                     enemy_losses.append(damaged_unit.unit)
         return AirLosses(player_losses, enemy_losses)
+
+    def aircraft_position_events(
+        self, raw_events: list[dict[str, Any]]
+    ) -> dict[str, AircraftPositionEvent]:
+        events = {}
+        for event in raw_events:
+            unit_name = str(event["name"])
+            if self.unit_map.flight(unit_name) is None:
+                continue
+            events[unit_name] = AircraftPositionEvent.from_json(event, self.game)
+        return events
+
+    def csar_pickup_events(self) -> dict[UUID, str]:
+        events = {}
+        for event in self.state_data.csar_pickups:
+            try:
+                events[UUID(str(event["target_id"]))] = str(event["unit"])
+            except (KeyError, ValueError):
+                logging.debug("Ignoring malformed CSAR pickup event: %s", event)
+        return events
 
     def dead_ground_units(self) -> GroundLosses:
         losses = GroundLosses()

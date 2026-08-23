@@ -36,6 +36,7 @@ variants:
   Mi-24P Hind-F: {}
 tasks:
   Air Assault: 20
+  CSAR: 20
   BAI: 410
   CAS: 410
   OCA/Aircraft: 410

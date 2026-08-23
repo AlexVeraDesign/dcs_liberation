@@ -86,6 +86,16 @@ class LogisticsInfo:
 
 
 @dataclass
+class CsarInfo:
+    target_id: str
+    unit_names: list[str]
+    position_x: float
+    position_y: float
+    radius_m: float
+    blue: bool
+
+
+@dataclass
 class MissionData:
     awacs: list[AwacsInfo] = field(default_factory=list)
     runways: list[RunwayData] = field(default_factory=list)
@@ -94,3 +104,4 @@ class MissionData:
     tankers: list[TankerInfo] = field(default_factory=list)
     jtacs: list[JtacInfo] = field(default_factory=list)
     logistics: list[LogisticsInfo] = field(default_factory=list)
+    csar: list[CsarInfo] = field(default_factory=list)

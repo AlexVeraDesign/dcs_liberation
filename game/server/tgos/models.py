@@ -9,7 +9,8 @@ from game.server.leaflet import LeafletPoint
 
 if TYPE_CHECKING:
     from game import Game
-    from game.theater import TheaterGroundObject
+    from game.csar import CsarTarget
+    from game.theater import MissionTarget, TheaterGroundObject
 
 
 class TgoJs(BaseModel):
@@ -29,7 +30,24 @@ class TgoJs(BaseModel):
         title = "Tgo"
 
     @staticmethod
-    def for_tgo(tgo: TheaterGroundObject) -> TgoJs:
+    def for_tgo(tgo: TheaterGroundObject | CsarTarget) -> TgoJs:
+        from game.csar import CsarTarget
+
+        if isinstance(tgo, CsarTarget):
+            return TgoJs(
+                id=tgo.id,
+                name=tgo.name,
+                control_point_name=tgo.squadron.location.name,
+                category=tgo.category,
+                blue=tgo.squadron.player,
+                position=LeafletPoint.from_pydcs(tgo.position),
+                units=[tgo.pilot.name],
+                threat_ranges=[],
+                detection_ranges=[],
+                dead=False,
+                sidc=str(tgo.sidc()),
+            )
+
         threat_ranges = [group.max_threat_range().meters for group in tgo.groups]
         detection_ranges = [group.max_detection_range().meters for group in tgo.groups]
         return TgoJs(
@@ -53,4 +71,6 @@ class TgoJs(BaseModel):
             for tgo in control_point.connected_objectives:
                 if not tgo.is_control_point:
                     tgos.append(TgoJs.for_tgo(tgo))
+        for csar_target in game.csar.targets:
+            tgos.append(TgoJs.for_tgo(csar_target))
         return tgos

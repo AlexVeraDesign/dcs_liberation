@@ -12,6 +12,7 @@ from .antiship import AntiShipFlightPlan
 from .bai import BaiFlightPlan
 from .barcap import BarCapFlightPlan
 from .cas import CasFlightPlan
+from .csar import CsarFlightPlan
 from .dead import DeadFlightPlan
 from .escort import EscortFlightPlan
 from .ferry import FerryFlightPlan
@@ -51,6 +52,7 @@ class FlightPlanBuilderTypes:
             FlightType.BAI: BaiFlightPlan.builder_type(),
             FlightType.BARCAP: BarCapFlightPlan.builder_type(),
             FlightType.CAS: CasFlightPlan.builder_type(),
+            FlightType.CSAR: CsarFlightPlan.builder_type(),
             FlightType.DEAD: DeadFlightPlan.builder_type(),
             FlightType.ESCORT: EscortFlightPlan.builder_type(),
             FlightType.OCA_AIRCRAFT: OcaAircraftFlightPlan.builder_type(),
