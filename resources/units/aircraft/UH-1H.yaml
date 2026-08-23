@@ -32,4 +32,5 @@ tasks:
   CAS: 210
   OCA/Aircraft: 210
   Transport: 30
+  CSAR: 30
 hit_points: 12

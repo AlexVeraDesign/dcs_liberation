@@ -3,9 +3,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from dcs.mapping import Point
+
 from game.debriefing import Debriefing
 from game.ground_forces.combat_stance import CombatStance
 from game.theater import ControlPoint
+from game.unitmap import FlyingUnit
 from .gameupdateevents import GameUpdateEvents
 from ..ato.airtaaskingorder import AirTaskingOrder
 from ..ato.flightstate.atdeparture import AtDeparture
@@ -26,6 +29,7 @@ class MissionResultsProcessor:
     def commit(self, debriefing: Debriefing, events: GameUpdateEvents) -> None:
         logging.info("Committing mission results")
         self.commit_air_losses(debriefing)
+        self.commit_csar_pickups(debriefing)
         self.commit_pilot_experience()
         self.commit_front_line_losses(debriefing)
         self.commit_convoy_losses(debriefing)
@@ -40,11 +44,7 @@ class MissionResultsProcessor:
 
     def commit_air_losses(self, debriefing: Debriefing) -> None:
         for loss in debriefing.air_losses.losses:
-            if loss.pilot is not None and (
-                not loss.pilot.player
-                or not self.game.settings.invulnerable_player_pilots
-            ):
-                loss.pilot.kill()
+            self.commit_pilot_loss(debriefing, loss)
             squadron = loss.flight.squadron
             aircraft = loss.flight.unit_type
             available = squadron.owned_aircraft
@@ -76,6 +76,51 @@ class MissionResultsProcessor:
                     loss.flight.squadron.coalition.ato.remove_package(
                         loss.flight.package
                     )
+
+    def commit_pilot_loss(self, debriefing: Debriefing, loss: FlyingUnit) -> None:
+        if loss.pilot is None:
+            return
+        if loss.pilot.player and self.game.settings.invulnerable_player_pilots:
+            return
+
+        unit_name = self.unit_name_for_loss(debriefing, loss)
+        ejection = (
+            debriefing.ejection_events.get(unit_name) if unit_name is not None else None
+        )
+        if ejection is not None and not loss.flight.unit_type.helicopter:
+            self.game.csar.add_aircraft_survivor(self.game, loss, ejection.position)
+            return
+
+        if loss.flight.unit_type.helicopter:
+            position = self.loss_position(debriefing, loss, unit_name)
+            self.game.csar.add_helicopter_loss(self.game, loss, position)
+            return
+
+        loss.pilot.kill()
+
+    def unit_name_for_loss(
+        self, debriefing: Debriefing, loss: FlyingUnit
+    ) -> str | None:
+        for unit_name, flying_unit in debriefing.unit_map.aircraft.items():
+            if flying_unit == loss:
+                return unit_name
+        return None
+
+    def loss_position(
+        self, debriefing: Debriefing, loss: FlyingUnit, unit_name: str | None
+    ) -> Point:
+        if unit_name is not None:
+            event = debriefing.aircraft_loss_positions.get(unit_name)
+            if event is not None:
+                return event.position
+        return loss.flight.package.target.position
+
+    def commit_csar_pickups(self, debriefing: Debriefing) -> None:
+        self.game.csar.handle_pickup_results(
+            self.game,
+            debriefing.csar_pickups,
+            set(debriefing.state_data.killed_aircraft),
+        )
 
     @staticmethod
     def _commit_pilot_experience(ato: AirTaskingOrder) -> None:

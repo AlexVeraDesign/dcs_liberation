@@ -15,6 +15,7 @@ class PilotRecord:
 class PilotStatus(Enum):
     Active = "Active"
     OnLeave = "On leave"
+    MIA = "MIA"
     Dead = "Dead"
 
 
@@ -27,11 +28,15 @@ class Pilot:
 
     @property
     def alive(self) -> bool:
-        return self.status is not PilotStatus.Dead
+        return self.status not in {PilotStatus.Dead, PilotStatus.MIA}
 
     @property
     def on_leave(self) -> bool:
         return self.status is PilotStatus.OnLeave
+
+    @property
+    def mia(self) -> bool:
+        return self.status is PilotStatus.MIA
 
     def send_on_leave(self) -> None:
         if self.status is not PilotStatus.Active:
@@ -45,6 +50,16 @@ class Pilot:
 
     def kill(self) -> None:
         self.status = PilotStatus.Dead
+
+    def mark_mia(self) -> None:
+        if self.status is PilotStatus.Dead:
+            raise RuntimeError("Dead pilots cannot become MIA")
+        self.status = PilotStatus.MIA
+
+    def recover(self) -> None:
+        if self.status is not PilotStatus.MIA:
+            raise RuntimeError("Only MIA pilots may be recovered")
+        self.status = PilotStatus.Active
 
     @classmethod
     def random(cls, faker: Faker) -> Pilot:

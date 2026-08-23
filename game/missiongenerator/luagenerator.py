@@ -135,6 +135,16 @@ class LuaGenerator:
             crate_item.add_key_value("unit", unit)
             crate_item.add_key_value("weight", weight)
 
+        csar_object = lua_data.add_item("CSAR")
+        for csar in self.mission_data.csar:
+            csar_item = csar_object.add_item()
+            csar_item.add_key_value("target_id", csar.target_id)
+            csar_item.add_data_array("unit_names", csar.unit_names)
+            csar_item.add_key_value("positionX", str(csar.position_x))
+            csar_item.add_key_value("positionY", str(csar.position_y))
+            csar_item.add_key_value("radius", str(csar.radius_m))
+            csar_item.add_key_value("side", str(2 if csar.blue else 1))
+
         target_points = lua_data.add_item("TargetPoints")
         all_packages = itertools.chain(
             self.game.blue.ato.packages, self.game.red.ato.packages
@@ -213,6 +223,47 @@ class LuaGenerator:
         trigger = TriggerStart(comment="Set DCS Liberation data")
         trigger.add_action(DoScript(String(lua_data.create_operations_lua())))
         self.mission.triggerrules.triggers.append(trigger)
+        if self.mission_data.csar:
+            self.inject_lua_trigger(self.csar_script(), "DCS Liberation CSAR")
+
+    @staticmethod
+    def csar_script() -> str:
+        return r"""
+local function csarSmokeAndMonitor()
+    if not dcsLiberation or not dcsLiberation.CSAR then
+        return nil
+    end
+
+    for _, csar in ipairs(dcsLiberation.CSAR) do
+        if not csar.recovered then
+            local pickupPoint = { x = tonumber(csar.positionX), y = land.getHeight({x = tonumber(csar.positionX), y = tonumber(csar.positionY)}), z = tonumber(csar.positionY) }
+            trigger.action.smoke(pickupPoint, trigger.smokeColor.Blue)
+            for _, unitName in ipairs(csar.unit_names) do
+                local unit = Unit.getByName(unitName)
+                if unit and unit:isExist() and unit:getLife() > 1 and unit:inAir() == false then
+                    local pos = unit:getPoint()
+                    local dx = pos.x - pickupPoint.x
+                    local dz = pos.z - pickupPoint.z
+                    if math.sqrt(dx * dx + dz * dz) <= tonumber(csar.radius) then
+                        csar.recovered = true
+                        local pickup = {}
+                        pickup.target_id = csar.target_id
+                        pickup.unit = unitName
+                        csar_pickups[#csar_pickups + 1] = pickup
+                        trigger.action.outTextForCoalition(tonumber(csar.side), "Pilot recovered. RTB.", 20)
+                        write_state()
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    timer.scheduleFunction(csarSmokeAndMonitor, {}, timer.getTime() + 30)
+end
+
+timer.scheduleFunction(csarSmokeAndMonitor, {}, timer.getTime() + 5)
+"""
 
     def inject_lua_trigger(self, contents: str, comment: str) -> None:
         """Creates the trigger for running the text script at mission start."""

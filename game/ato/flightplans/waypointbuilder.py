@@ -509,6 +509,18 @@ class WaypointBuilder:
         )
 
     @staticmethod
+    def csar_pickup_zone(target: MissionTarget) -> FlightWaypoint:
+        return FlightWaypoint(
+            "CSARPICKUP",
+            FlightWaypointType.PICKUP_ZONE,
+            target.position,
+            meters(0),
+            "RADIO",
+            description=f"Recover pilot at {target.name}",
+            pretty_name="CSAR pickup",
+        )
+
+    @staticmethod
     def dropoff_zone(drop_off: MissionTarget) -> FlightWaypoint:
         """Creates a dropoff landing zone waypoint
         This waypoint is used to generate the Trigger Zone used for AirAssault and

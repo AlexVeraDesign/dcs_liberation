@@ -52,7 +52,11 @@ class SquadronDelegate(TwoColumnRowDelegate):
             active = len(squadron.active_pilots)
             available = len(squadron.available_pilots)
             on_leave = len(squadron.pilots_on_leave)
-            return f"{active} active, {available} unassigned, {on_leave} on leave"
+            mia = len(squadron.pilots_mia)
+            return (
+                f"{active} active, {available} unassigned, "
+                f"{on_leave} on leave, {mia} MIA"
+            )
         return ""
 
 

@@ -14,12 +14,14 @@ from game.callsigns.callsign import callsign_for_support_unit
 from game.callsigns.callsigngenerator import Callsign, FlightCallsignGenerator
 from game.data.weapons import Pylon
 from game.missiongenerator.logisticsgenerator import LogisticsGenerator
-from game.missiongenerator.missiondata import AwacsInfo, MissionData, TankerInfo
+from game.missiongenerator.missiondata import AwacsInfo, CsarInfo, MissionData, TankerInfo
 from game.radio.radios import RadioFrequency, RadioRegistry
 from game.radio.tacan import TacanBand, TacanRegistry, TacanUsage
 from game.runways import RunwayData
 from game.squadrons import Pilot
 from game.unitmap import UnitMap
+from game.ato.flightplans.csar import CsarFlightPlan
+from game.csar import CsarTarget
 from .aircraftbehavior import AircraftBehavior
 from .aircraftpainter import AircraftPainter
 from .bingoestimator import BingoEstimator
@@ -95,6 +97,21 @@ class FlightGroupConfigurator:
                     self.game.lua_plugin_manager,
                     transfer,
                 ).generate_logistics()
+            )
+
+        if isinstance(self.flight.flight_plan, CsarFlightPlan) and isinstance(
+            self.flight.package.target, CsarTarget
+        ):
+            target = self.flight.package.target
+            self.mission_data.csar.append(
+                CsarInfo(
+                    target_id=str(target.id),
+                    unit_names=[str(unit.name) for unit in self.group.units],
+                    position_x=target.position.x,
+                    position_y=target.position.y,
+                    radius_m=self.flight.flight_plan.pickup_zone_radius.meters,
+                    blue=self.flight.blue,
+                )
             )
 
         mission_start_time, waypoints = WaypointGenerator(
