@@ -55,13 +55,8 @@ class QCsarInfoDialog(QDialog):
 
         turns_left = "Unknown"
         if survivor.ejection_turn is not None:
-            turns_left = str(
-                max(
-                    0,
-                    self.target.lifetime_turns
-                    - (self.game.turn - survivor.ejection_turn),
-                )
-            )
+            elapsed_turns = max(0, self.game.turn - survivor.ejection_turn - 1)
+            turns_left = str(max(0, self.target.lifetime_turns - elapsed_turns))
 
         values = [
             survivor.pilot.name,

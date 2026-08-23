@@ -59,10 +59,6 @@ class CsarSurvivor:
     def squadron_name(self) -> str:
         return str(self.squadron)
 
-    @property
-    def base_name(self) -> str:
-        return self.squadron.location.name
-
 
 @dataclass
 class CsarTarget(MissionTarget, SidcDescribable):
@@ -121,7 +117,10 @@ class CsarTarget(MissionTarget, SidcDescribable):
         return CSAR_SEA_LIFETIME_TURNS if self.sea else CSAR_LAND_LIFETIME_TURNS
 
     def turns_remaining(self, current_turn: int) -> int:
-        return max(0, self.lifetime_turns - (current_turn - self.turn_created))
+        return max(0, self.lifetime_turns - self.elapsed_turns(current_turn))
+
+    def elapsed_turns(self, current_turn: int) -> int:
+        return max(0, current_turn - self.turn_created - 1)
 
     @property
     def location_text(self) -> str:
@@ -165,6 +164,8 @@ class CsarManager:
             return None
         if not loss.flight.squadron.player:
             pilot.kill()
+            if pilot in loss.flight.squadron.available_pilots:
+                loss.flight.squadron.available_pilots.remove(pilot)
             return None
         if pilot.player and game.settings.invulnerable_player_pilots:
             return None
@@ -175,6 +176,8 @@ class CsarManager:
     ) -> CsarTarget | None:
         if loss.pilot is not None and not loss.flight.squadron.player:
             loss.pilot.kill()
+            if loss.pilot in loss.flight.squadron.available_pilots:
+                loss.flight.squadron.available_pilots.remove(loss.pilot)
             return None
         if random.random() > CSAR_HELICOPTER_SURVIVAL_CHANCE:
             if loss.pilot is not None and (
@@ -192,6 +195,8 @@ class CsarManager:
             return None
 
         pilot.mark_mia()
+        if pilot in loss.flight.squadron.available_pilots:
+            loss.flight.squadron.available_pilots.remove(pilot)
         survivor = CsarSurvivor(
             pilot=pilot,
             squadron=loss.flight.squadron,
@@ -306,6 +311,8 @@ class CsarManager:
     def kill(self, game: Game, target: CsarTarget) -> None:
         for survivor in target.survivors:
             survivor.pilot.kill()
+            if survivor.pilot in survivor.squadron.available_pilots:
+                survivor.squadron.available_pilots.remove(survivor.pilot)
         self.remove(game, target)
 
     def remove(self, game: Game, target: CsarTarget) -> None:
@@ -366,7 +373,7 @@ class CsarManager:
             if resolution is CsarResolution.CAPTURED:
                 self.kill(game, target)
                 continue
-            if game.turn - target.turn_created >= target.lifetime_turns:
+            if target.elapsed_turns(game.turn) >= target.lifetime_turns:
                 self.kill(game, target)
 
     def handle_pickup_results(

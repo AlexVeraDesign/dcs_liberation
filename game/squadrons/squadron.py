@@ -236,7 +236,7 @@ class Squadron:
 
     @property
     def _number_of_unfilled_pilot_slots(self) -> int:
-        return self.pilot_limit - len(self.active_pilots)
+        return self.pilot_limit - len(self.active_pilots) - len(self.pilots_mia)
 
     @property
     def number_of_available_pilots(self) -> int:
