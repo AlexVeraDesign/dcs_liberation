@@ -8,12 +8,14 @@ from dcs.mapping import Point
 from dcs.terrain import Caucasus
 
 from game.ato import FlightType
+from game.ato.flightplans.csar import Builder as CsarBuilder
 from game.csar import CsarManager, CsarResolution, CsarTarget
 from game.db.gamedb import GameDb
 from game.server.tgos.models import TgoJs
 from game.squadrons.pilot import Pilot, PilotStatus
 from game.squadrons.squadron import Squadron
 from game.unitmap import FlyingUnit
+from game.utils import meters
 
 
 def point(x: float, y: float) -> Point:
@@ -387,3 +389,34 @@ def test_csar_target_mission_types() -> None:
         FlightType.ESCORT,
         FlightType.SWEEP,
     ]
+
+
+def test_csar_flight_plan_does_not_require_package_waypoints() -> None:
+    departure = SimpleNamespace(position=point(0, 0))
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(5000, 0), 0, sea=False)
+    threat_zone = SimpleNamespace(path_threatened=lambda _a, _b: False)
+    doctrine = SimpleNamespace(
+        helicopter=SimpleNamespace(air_assault_nav_altitude=meters(500)),
+        resolve_combat_altitude=lambda _is_helo: meters(500),
+        resolve_rendezvous_altitude=lambda _is_helo: meters(500),
+    )
+    coalition = SimpleNamespace(
+        doctrine=doctrine,
+        opponent=SimpleNamespace(threat_zone=threat_zone),
+        nav_mesh=SimpleNamespace(shortest_path=lambda a, b: [a, b]),
+        bullseye=SimpleNamespace(position=point(10000, 10000)),
+    )
+    flight = SimpleNamespace(
+        is_helo=True,
+        squadron=SimpleNamespace(aircraft=SimpleNamespace(cabin_size=6)),
+        departure=departure,
+        arrival=departure,
+        divert=None,
+        coalition=coalition,
+        package=SimpleNamespace(target=target, waypoints=None),
+    )
+
+    layout = CsarBuilder(flight).layout()
+
+    assert layout.pickup.position == target.position
+    assert layout.ingress.position.distance_to_point(target.position) == 2000
