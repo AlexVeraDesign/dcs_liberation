@@ -10,6 +10,7 @@ from dcs.terrain import Caucasus
 
 from game.ato.flightplans.airassault import Builder as AirAssaultBuilder
 from game.ato.flightplans.airlift import Builder as AirliftBuilder
+from game.ato.flightplans.csar import Builder as CsarBuilder
 from game.ato.flightplans.ferry import Builder as FerryBuilder
 from game.ato.flightplans.waypointbuilder import WaypointBuilder
 from game.ato.flightwaypoint import AltitudeReference, FlightWaypoint
@@ -118,6 +119,7 @@ def flight(
         divert=None,
         is_helo=is_helo,
         unit_type=unit_type,
+        squadron=SimpleNamespace(aircraft=SimpleNamespace(cabin_size=4)),
         coalition=coalition,
         package=SimpleNamespace(
             time_over_target=datetime(2026, 1, 1),
@@ -271,3 +273,47 @@ def test_air_assault_nav_respects_higher_doctrine_altitude(
 
     for segment in (layout.nav_to_ingress, layout.nav_to_home):
         assert_waypoints(segment, [FlightWaypointType.NAV], feet(4500), "RADIO")
+
+
+def test_csar_helicopter_cruise_profile_uses_3000_ft_agl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_nav_path(monkeypatch)
+
+    layout = CsarBuilder(cast(Any, flight(is_helo=True))).layout()
+
+    assert layout.ingress.waypoint_type == FlightWaypointType.INGRESS_AIR_ASSAULT
+    assert layout.pickup.waypoint_type == FlightWaypointType.PICKUP_ZONE
+    for segment in (layout.nav_to_pickup, layout.nav_to_home):
+        assert_waypoints(
+            segment,
+            [
+                FlightWaypointType.ASCEND_POINT,
+                FlightWaypointType.NAV,
+                FlightWaypointType.DESCENT_POINT,
+            ],
+            feet(3000),
+            "RADIO",
+        )
+
+
+def test_csar_helicopter_cruise_profile_respects_higher_doctrine_altitude(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_nav_path(monkeypatch)
+
+    layout = CsarBuilder(
+        cast(Any, flight(is_helo=True, air_assault_nav_altitude=feet(4500)))
+    ).layout()
+
+    for segment in (layout.nav_to_pickup, layout.nav_to_home):
+        assert_waypoints(
+            segment,
+            [
+                FlightWaypointType.ASCEND_POINT,
+                FlightWaypointType.NAV,
+                FlightWaypointType.DESCENT_POINT,
+            ],
+            feet(4500),
+            "RADIO",
+        )
