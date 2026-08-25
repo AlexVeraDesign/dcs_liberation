@@ -88,7 +88,7 @@ class Builder(IBuilder[AirAssaultFlightPlan, AirAssaultLayout]):
             raise PlanningError("Air assault is only usable by helicopters")
         assert self.package.waypoints is not None
 
-        altitude = self.doctrine.helicopter.air_assault_nav_altitude
+        altitude = self.doctrine.resolve_air_assault_nav_altitude()
         altitude_is_agl = self.flight.is_helo
 
         builder = WaypointBuilder(self.flight, self.coalition)

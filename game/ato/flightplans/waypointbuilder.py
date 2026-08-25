@@ -553,6 +553,36 @@ class WaypointBuilder:
         )
 
     @staticmethod
+    def ascend_point(
+        position: Point, altitude: Distance, altitude_is_agl: bool = False
+    ) -> FlightWaypoint:
+        alt_type: AltitudeReference = "RADIO" if altitude_is_agl else "BARO"
+        return FlightWaypoint(
+            "TOC",
+            FlightWaypointType.ASCEND_POINT,
+            position,
+            altitude,
+            alt_type,
+            description="Top of climb",
+            pretty_name="TOC",
+        )
+
+    @staticmethod
+    def descent_point(
+        position: Point, altitude: Distance, altitude_is_agl: bool = False
+    ) -> FlightWaypoint:
+        alt_type: AltitudeReference = "RADIO" if altitude_is_agl else "BARO"
+        return FlightWaypoint(
+            "TOD",
+            FlightWaypointType.DESCENT_POINT,
+            position,
+            altitude,
+            alt_type,
+            description="Top of descent",
+            pretty_name="TOD",
+        )
+
+    @staticmethod
     def nav(
         position: Point, altitude: Distance, altitude_is_agl: bool = False
     ) -> FlightWaypoint:

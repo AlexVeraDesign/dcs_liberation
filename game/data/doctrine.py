@@ -207,6 +207,9 @@ class Doctrine:
             return self.helicopter.rendezvous_altitude
         return self.rendezvous_altitude
 
+    def resolve_air_assault_nav_altitude(self) -> Distance:
+        return max(self.helicopter.air_assault_nav_altitude, feet(3000))
+
     @classmethod
     def register(cls, doctrine: Doctrine) -> None:
         if doctrine.name in cls._by_name:

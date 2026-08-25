@@ -64,7 +64,7 @@ class Builder(IBuilder[FerryFlightPlan, FerryLayout]):
 
         altitude_is_agl = self.flight.unit_type.dcs_unit_type.helicopter
         altitude = (
-            feet(1500)
+            feet(3000)
             if altitude_is_agl
             else self.flight.unit_type.preferred_patrol_altitude
         )
