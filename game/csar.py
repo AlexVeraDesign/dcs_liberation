@@ -31,6 +31,7 @@ CSAR_RECOVERY_RADIUS: Distance = nautical_miles(20)
 CSAR_CAPTURE_RADIUS: Distance = nautical_miles(20)
 CSAR_GROUPING_RADIUS: Distance = nautical_miles(10)
 CSAR_PICKUP_RADIUS_METERS = 300
+CSAR_MAX_PLANNED_MOVEMENT: Distance = nautical_miles(2)
 CSAR_LAND_LIFETIME_TURNS = 8
 CSAR_SEA_LIFETIME_TURNS = 1
 CSAR_HELICOPTER_SURVIVAL_CHANCE = 0.20
@@ -70,6 +71,7 @@ class CsarTarget(MissionTarget, SidcDescribable):
     id: uuid.UUID = field(default_factory=uuid.uuid4)
     picked_up_by: str | None = None
     survivors: list[CsarSurvivor] = field(default_factory=list)
+    next_turn_position: Point | None = None
 
     def __post_init__(self) -> None:
         self._ensure_survivors()
@@ -92,6 +94,8 @@ class CsarTarget(MissionTarget, SidcDescribable):
             ]
         if not hasattr(self, "picked_up_by"):
             self.picked_up_by = None
+        if not hasattr(self, "next_turn_position"):
+            self.next_turn_position = None
 
     @property
     def display_name(self) -> str:
@@ -150,6 +154,51 @@ class CsarTarget(MissionTarget, SidcDescribable):
             yield FlightType.TARCAP
             yield FlightType.ESCORT
             yield FlightType.SWEEP
+
+    @property
+    def can_plan_movement(self) -> bool:
+        return not self.sea
+
+    @property
+    def max_move_distance(self) -> Distance:
+        return CSAR_MAX_PLANNED_MOVEMENT
+
+    def destination_in_range(self, destination: Point) -> bool:
+        return (
+            destination.distance_to_point(self.position)
+            <= self.max_move_distance.meters
+        )
+
+    def plan_movement(self, destination: Point) -> None:
+        if not self.can_plan_movement:
+            raise ValueError("Sea CSAR targets cannot move")
+        if not self.destination_in_range(destination):
+            raise ValueError(
+                f"Cannot move CSAR target more than "
+                f"{self.max_move_distance.nautical_miles}nm."
+            )
+        self.next_turn_position = destination
+
+    def clear_planned_movement(self) -> None:
+        self.next_turn_position = None
+
+    def apply_planned_movement(self, game: Game) -> None:
+        if self.next_turn_position is None:
+            return
+        if not self.can_plan_movement:
+            self.next_turn_position = None
+            return
+
+        delta = self.next_turn_position - self.position
+        self.position = game.point_in_world(
+            self.next_turn_position.x, self.next_turn_position.y
+        )
+        self.next_turn_position = None
+        for survivor in self.survivors:
+            if survivor.position is not None:
+                survivor.position = game.point_in_world(
+                    survivor.position.x + delta.x, survivor.position.y + delta.y
+                )
 
 
 @dataclass
@@ -366,6 +415,7 @@ class CsarManager:
 
     def process_turn(self, game: Game) -> None:
         for target in list(self.targets):
+            target.apply_planned_movement(game)
             resolution = self.resolve_by_control_points(game, target)
             if resolution is CsarResolution.RECOVERED:
                 self.recover(game, target)

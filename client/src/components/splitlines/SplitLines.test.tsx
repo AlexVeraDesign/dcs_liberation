@@ -1,6 +1,5 @@
 import SplitLines from "./SplitLines";
-import { screen } from "@testing-library/dom";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 
 describe("SplitLines", () => {
   it("joins items with line break tags", () => {

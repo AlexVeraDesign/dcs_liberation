@@ -4,18 +4,19 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
 from dcs.mapping import Point
 from dcs.terrain import Caucasus
 
 from game.ato import FlightType
 from game.ato.flightplans.csar import Builder as CsarBuilder
-from game.csar import CsarManager, CsarResolution, CsarTarget
+from game.csar import CsarManager, CsarResolution, CsarSurvivor, CsarTarget
 from game.db.gamedb import GameDb
 from game.server.tgos.models import TgoJs
 from game.squadrons.pilot import Pilot, PilotStatus
 from game.squadrons.squadron import Squadron
 from game.unitmap import FlyingUnit
-from game.utils import meters
+from game.utils import meters, nautical_miles
 
 
 def point(x: float, y: float) -> Point:
@@ -36,6 +37,7 @@ class FakeControlPoint:
 class FakeTheater:
     controlpoints: list[FakeControlPoint]
     sea: bool = False
+    terrain: Caucasus = field(default_factory=Caucasus)
 
     def is_in_sea(self, position: Point) -> bool:
         return self.sea
@@ -268,6 +270,105 @@ def test_csar_map_label_uses_squadrons_not_bases() -> None:
     assert tgo.control_point_name == "LHD Squadron, Vaziani Squadron"
 
 
+def test_land_csar_target_exposes_planned_movement_on_map() -> None:
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(0, 0), 0, sea=False)
+    target.plan_movement(point(1000, 0))
+
+    tgo = TgoJs.for_tgo(target)
+
+    assert tgo.mobile is True
+    assert tgo.destination is not None
+    assert target.next_turn_position is not None
+    expected = target.next_turn_position.latlng()
+    assert tgo.destination.lat == expected.lat
+    assert tgo.destination.lng == expected.lng
+
+
+def test_sea_csar_target_cannot_plan_movement() -> None:
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(0, 0), 0, sea=True)
+
+    with pytest.raises(ValueError):
+        target.plan_movement(point(1000, 0))
+
+    assert target.next_turn_position is None
+    assert TgoJs.for_tgo(target).mobile is False
+
+
+def test_csar_planned_movement_range_is_from_current_position() -> None:
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(0, 0), 0, sea=False)
+
+    target.plan_movement(point(nautical_miles(1).meters, 0))
+    with pytest.raises(ValueError):
+        target.plan_movement(point(nautical_miles(2.5).meters, 0))
+    target.plan_movement(point(nautical_miles(2).meters, 0))
+
+    assert target.next_turn_position is not None
+    assert target.next_turn_position.x == nautical_miles(2).meters
+
+
+def test_csar_planned_movement_moves_group_as_one() -> None:
+    game = game_with_cps()
+    manager = CsarManager()
+    target = CsarTarget(
+        Pilot("Pilot A"),
+        FakeSquadron(),
+        point(500, 0),
+        0,
+        sea=False,
+        survivors=[
+            CsarSurvivor(Pilot("Pilot A"), FakeSquadron(), position=point(0, 0)),
+            CsarSurvivor(Pilot("Pilot B"), FakeSquadron(), position=point(1000, 0)),
+        ],
+    )
+    manager.targets.append(target)
+    target.plan_movement(point(1500, 0))
+
+    manager.process_turn(game)
+
+    assert target.position.x == 1500
+    positions = [survivor.position for survivor in target.survivors]
+    assert all(position is not None for position in positions)
+    assert [position.x for position in positions if position is not None] == [
+        1000,
+        2000,
+    ]
+    assert target.next_turn_position is None
+
+
+def test_csar_planned_movement_applies_before_automatic_recovery() -> None:
+    pilot = Pilot("Pilot")
+    squadron = FakeSquadron()
+    game = game_with_cps(
+        FakeControlPoint("Friendly", point(nautical_miles(2).meters, 0), True)
+    )
+    game.settings.csar_friendly_recovery_radius = 0.25
+    manager = CsarManager()
+    target = CsarTarget(pilot, squadron, point(0, 0), 0, sea=False)
+    pilot.mark_mia()
+    manager.targets.append(target)
+    target.plan_movement(point(nautical_miles(2).meters, 0))
+
+    manager.process_turn(game)
+
+    assert pilot.status is PilotStatus.Active
+    assert target not in manager.targets
+
+
+def test_legacy_csar_target_save_has_no_planned_movement() -> None:
+    target = object.__new__(CsarTarget)
+    target.__setstate__(
+        {
+            "pilot": Pilot("Pilot"),
+            "squadron": FakeSquadron(),
+            "position": point(0, 0),
+            "turn_created": 0,
+            "sea": False,
+        }
+    )
+
+    assert target.next_turn_position is None
+
+
 def test_land_csar_expiration_kills_pilot() -> None:
     pilot = Pilot("Pilot")
     game = game_with_cps()
@@ -397,6 +498,7 @@ def test_csar_flight_plan_does_not_require_package_waypoints() -> None:
     threat_zone = SimpleNamespace(path_threatened=lambda _a, _b: False)
     doctrine = SimpleNamespace(
         helicopter=SimpleNamespace(air_assault_nav_altitude=meters(500)),
+        resolve_air_assault_nav_altitude=lambda: meters(500),
         resolve_combat_altitude=lambda _is_helo: meters(500),
         resolve_rendezvous_altitude=lambda _is_helo: meters(500),
     )
