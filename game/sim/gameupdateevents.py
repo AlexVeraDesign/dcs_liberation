@@ -9,6 +9,7 @@ from dcs import Point
 if TYPE_CHECKING:
     from game import Game
     from game.ato import Flight, Package
+    from game.csar import CsarTarget
     from game.navmesh import NavMesh
     from game.sim.combat import FrozenCombat
     from game.theater import ControlPoint, FrontLine, TheaterGroundObject
@@ -33,7 +34,7 @@ class GameUpdateEvents:
     deselected_flight: bool = False
     updated_front_lines: set[FrontLine] = field(default_factory=set)
     deleted_front_lines: set[UUID] = field(default_factory=set)
-    updated_tgos: set[TheaterGroundObject] = field(default_factory=set)
+    updated_tgos: set[TheaterGroundObject | CsarTarget] = field(default_factory=set)
     updated_control_points: set[ControlPoint] = field(default_factory=set)
     updated_iads: set[IadsNetworkNode] = field(default_factory=set)
     deleted_iads_connections: set[UUID] = field(default_factory=set)
@@ -118,7 +119,7 @@ class GameUpdateEvents:
         self.deleted_front_lines.add(front_line.id)
         return self
 
-    def update_tgo(self, tgo: TheaterGroundObject) -> GameUpdateEvents:
+    def update_tgo(self, tgo: TheaterGroundObject | CsarTarget) -> GameUpdateEvents:
         self.updated_tgos.add(tgo)
         return self
 

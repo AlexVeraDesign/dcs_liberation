@@ -20,6 +20,8 @@ class TgoJs(BaseModel):
     category: str
     blue: bool
     position: LeafletPoint
+    mobile: bool
+    destination: LeafletPoint | None
     units: list[str]  # TODO: Event stream
     threat_ranges: list[float]  # TODO: Event stream
     detection_ranges: list[float]  # TODO: Event stream
@@ -44,6 +46,12 @@ class TgoJs(BaseModel):
                 category=tgo.category,
                 blue=tgo.squadron.player,
                 position=LeafletPoint.from_pydcs(tgo.position),
+                mobile=tgo.can_plan_movement and tgo.is_friendly(to_player=True),
+                destination=(
+                    LeafletPoint.from_pydcs(tgo.next_turn_position)
+                    if tgo.next_turn_position is not None
+                    else None
+                ),
                 units=(
                     [s.pilot.name for s in tgo.survivors]
                     if len(tgo.survivors) > 1
@@ -64,6 +72,8 @@ class TgoJs(BaseModel):
             category=tgo.category,
             blue=tgo.control_point.captured,
             position=LeafletPoint.from_pydcs(tgo.position),
+            mobile=False,
+            destination=None,
             units=[unit.display_name for unit in tgo.units],
             threat_ranges=threat_ranges,
             detection_ranges=detection_ranges,
