@@ -78,31 +78,6 @@ class CsarFlightPlan(StandardFlightPlan[CsarLayout], UiZoneDisplay):
 
 
 class Builder(IBuilder[CsarFlightPlan, CsarLayout]):
-    @staticmethod
-    def _profiled_nav_path(
-        builder: WaypointBuilder,
-        origin: Point,
-        destination: Point,
-        altitude: Distance,
-    ) -> list[FlightWaypoint]:
-        if origin.distance_to_point(destination) == 0:
-            return []
-
-        nav_path = builder.nav_path(
-            origin,
-            destination,
-            altitude,
-            altitude_is_agl=True,
-        )
-        toc_target = nav_path[0].position if nav_path else destination
-        tod_origin = nav_path[-1].position if nav_path else origin
-
-        return [
-            builder.ascend_point(origin.lerp(toc_target, 0.25), altitude, True),
-            *nav_path,
-            builder.descent_point(tod_origin.lerp(destination, 0.75), altitude, True),
-        ]
-
     def layout(self) -> CsarLayout:
         if not self.flight.is_helo or self.flight.squadron.aircraft.cabin_size <= 0:
             raise PlanningError("CSAR requires a transport-capable helicopter")
@@ -114,11 +89,11 @@ class Builder(IBuilder[CsarFlightPlan, CsarLayout]):
 
         return CsarLayout(
             departure=builder.takeoff(self.flight.departure),
-            nav_to_pickup=self._profiled_nav_path(
-                builder,
+            nav_to_pickup=builder.nav_path_with_cruise_profile(
                 self.flight.departure.position,
                 ingress_position,
                 altitude,
+                altitude_is_agl=True,
             ),
             ingress=builder.ingress(
                 FlightWaypointType.INGRESS_AIR_ASSAULT,
@@ -126,11 +101,11 @@ class Builder(IBuilder[CsarFlightPlan, CsarLayout]):
                 self.package.target,
             ),
             pickup=pickup,
-            nav_to_home=self._profiled_nav_path(
-                builder,
+            nav_to_home=builder.nav_path_with_cruise_profile(
                 pickup.position,
                 self.flight.arrival.position,
                 altitude,
+                altitude_is_agl=True,
             ),
             arrival=builder.land(self.flight.arrival),
             divert=builder.divert(self.flight.divert),

@@ -317,6 +317,23 @@ def test_csar_helicopter_cruise_profile_uses_3000_ft_agl(
         )
 
 
+def test_csar_helicopter_toc_and_tod_are_near_leg_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_nav_path(monkeypatch)
+    csar_flight = flight(is_helo=True)
+    csar_flight.package.waypoints = SimpleNamespace(ingress=point(30000, 0))
+
+    layout = CsarBuilder(cast(Any, csar_flight)).layout()
+
+    assert layout.nav_to_pickup[0].position.distance_to_point(
+        csar_flight.departure.position
+    ) == pytest.approx(nautical_miles(2).meters)
+    assert layout.nav_to_pickup[-1].position.distance_to_point(
+        layout.ingress.position
+    ) == pytest.approx(nautical_miles(2).meters)
+
+
 def test_csar_helicopter_cruise_profile_respects_higher_doctrine_altitude(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
