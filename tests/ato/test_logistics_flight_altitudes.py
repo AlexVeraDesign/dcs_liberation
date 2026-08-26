@@ -216,6 +216,26 @@ def test_airlift_helicopter_cruise_profile_uses_3000_ft_agl(
         )
 
 
+def test_airlift_helicopter_toc_and_tod_are_near_leg_endpoints(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_nav_path(monkeypatch)
+    helo_flight = flight(is_helo=True)
+    helo_flight.cargo = SimpleNamespace(
+        origin=control_point("Pickup", point(30000, 0)),
+        next_stop=control_point("Dropoff", point(60000, 0)),
+    )
+
+    layout = AirliftBuilder(cast(Any, helo_flight)).layout()
+
+    assert layout.nav_to_pickup[0].position.distance_to_point(
+        helo_flight.departure.position
+    ) == pytest.approx(nautical_miles(2).meters)
+    assert layout.nav_to_pickup[-1].position.distance_to_point(
+        helo_flight.cargo.origin.position
+    ) == pytest.approx(nautical_miles(2).meters)
+
+
 def test_airlift_fixed_wing_cruise_profile_uses_preferred_patrol_altitude(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

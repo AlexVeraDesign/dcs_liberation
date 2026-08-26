@@ -582,6 +582,45 @@ class WaypointBuilder:
             pretty_name="TOD",
         )
 
+    def nav_path_with_cruise_profile(
+        self, a: Point, b: Point, altitude: Distance, altitude_is_agl: bool = False
+    ) -> List[FlightWaypoint]:
+        if a.distance_to_point(b) == 0:
+            return []
+
+        nav_path = self.nav_path(a, b, altitude, altitude_is_agl)
+        toc_target = nav_path[0].position if nav_path else b
+        tod_origin = nav_path[-1].position if nav_path else a
+        profile_distance = nautical_miles(2 if altitude_is_agl else 10)
+
+        return [
+            self.ascend_point(
+                self.profile_point_after(a, toc_target, profile_distance),
+                altitude,
+                altitude_is_agl,
+            ),
+            *nav_path,
+            self.descent_point(
+                self.profile_point_before_destination(tod_origin, b, profile_distance),
+                altitude,
+                altitude_is_agl,
+            ),
+        ]
+
+    @staticmethod
+    def profile_point_after(a: Point, b: Point, profile_distance: Distance) -> Point:
+        leg_distance = a.distance_to_point(b)
+        distance_from_origin = min(profile_distance.meters, leg_distance * 0.25)
+        return a.lerp(b, distance_from_origin / leg_distance)
+
+    @staticmethod
+    def profile_point_before_destination(
+        a: Point, b: Point, profile_distance: Distance
+    ) -> Point:
+        leg_distance = a.distance_to_point(b)
+        distance_from_destination = min(profile_distance.meters, leg_distance * 0.25)
+        return a.lerp(b, 1 - distance_from_destination / leg_distance)
+
     @staticmethod
     def nav(
         position: Point, altitude: Distance, altitude_is_agl: bool = False

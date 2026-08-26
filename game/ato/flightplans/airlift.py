@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Type
 
-from game.positioned import Positioned
 from game.theater.missiontarget import MissionTarget
 from game.utils import Distance, feet
 from .ibuilder import IBuilder
@@ -91,36 +90,6 @@ class Builder(IBuilder[AirliftFlightPlan, AirliftLayout]):
             return feet(3000), True
         return self.flight.unit_type.preferred_patrol_altitude, False
 
-    @staticmethod
-    def _profiled_nav_path(
-        builder: WaypointBuilder,
-        origin: Positioned,
-        destination: Positioned,
-        altitude: Distance,
-        altitude_is_agl: bool,
-    ) -> list[FlightWaypoint]:
-        if origin.position.distance_to_point(destination.position) == 0:
-            return []
-
-        nav_path = builder.nav_path(
-            origin.position,
-            destination.position,
-            altitude,
-            altitude_is_agl,
-        )
-        toc_target = nav_path[0].position if nav_path else destination.position
-        tod_origin = nav_path[-1].position if nav_path else origin.position
-
-        return [
-            builder.ascend_point(
-                origin.position.lerp(toc_target, 0.25), altitude, altitude_is_agl
-            ),
-            *nav_path,
-            builder.descent_point(
-                tod_origin.lerp(destination.position, 0.75), altitude, altitude_is_agl
-            ),
-        ]
-
     def layout(self) -> AirliftLayout:
         cargo = self.flight.cargo
         if cargo is None:
@@ -159,10 +128,9 @@ class Builder(IBuilder[AirliftFlightPlan, AirliftLayout]):
             pickup_zone.only_for_player = True
             drop_off_zone.only_for_player = True
 
-        nav_to_pickup = self._profiled_nav_path(
-            builder,
-            self.flight.departure,
-            cargo.origin,
+        nav_to_pickup = builder.nav_path_with_cruise_profile(
+            self.flight.departure.position,
+            cargo.origin.position,
             altitude,
             altitude_is_agl,
         )
@@ -172,19 +140,17 @@ class Builder(IBuilder[AirliftFlightPlan, AirliftLayout]):
             nav_to_pickup=nav_to_pickup,
             pickup=pickup,
             ctld_pickup_zone=pickup_zone,
-            nav_to_drop_off=self._profiled_nav_path(
-                builder,
-                cargo.origin,
-                cargo.next_stop,
+            nav_to_drop_off=builder.nav_path_with_cruise_profile(
+                cargo.origin.position,
+                cargo.next_stop.position,
                 altitude,
                 altitude_is_agl,
             ),
             drop_off=drop_off,
             ctld_drop_off_zone=drop_off_zone,
-            nav_to_home=self._profiled_nav_path(
-                builder,
-                cargo.origin,
-                self.flight.arrival,
+            nav_to_home=builder.nav_path_with_cruise_profile(
+                cargo.origin.position,
+                self.flight.arrival.position,
                 altitude,
                 altitude_is_agl,
             ),
