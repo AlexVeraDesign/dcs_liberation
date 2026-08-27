@@ -102,26 +102,25 @@ function TgoTooltip(props: TgoProps) {
 
 interface PrimaryMobileTgoProps {
   tgo: TgoModel;
+  hasDestination: boolean;
+  setHasDestination: (hasDestination: boolean) => void;
 }
 
 function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
   const markerRef = useRef<LMarker | null>(null);
   const pathRef = useRef<MovementPathHandle | null>(null);
-  const [hasDestination, setHasDestination] = useState<boolean>(
-    props.tgo.destination != null
-  );
   const [position, setPosition] = useState<LatLngLiteral>(
     props.tgo.destination ? props.tgo.destination : props.tgo.position
   );
 
   const setDestination = useCallback((destination: LatLng) => {
     setPosition(destination);
-    setHasDestination(true);
-  }, []);
+    props.setHasDestination(true);
+  }, [props]);
 
   const resetDestination = useCallback(() => {
     setPosition(props.tgo.position);
-    setHasDestination(false);
+    props.setHasDestination(false);
   }, [props]);
 
   const [openNewPackageDialog] = useOpenNewTgoPackageDialogMutation();
@@ -131,11 +130,11 @@ function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
 
   useEffect(() => {
     markerRef.current?.setTooltipContent(
-      props.tgo.destination
-        ? destinationTooltipText(props.tgo, props.tgo.destination, true)
+      props.hasDestination
+        ? destinationTooltipText(props.tgo, position, true)
         : tooltipText(props.tgo)
     );
-  });
+  }, [props.hasDestination, position, props.tgo]);
 
   return (
     <>
@@ -145,7 +144,7 @@ function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
         draggable={!isLoading}
         autoPan
         zIndexOffset={1000}
-        opacity={props.tgo.destination ? 0.5 : 1}
+        opacity={props.hasDestination ? 0.5 : 1}
         ref={(ref) => {
           if (ref != null) {
             markerRef.current = ref;
@@ -153,12 +152,12 @@ function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
         }}
         eventHandlers={{
           click: () => {
-            if (!hasDestination) {
+            if (!props.hasDestination) {
               openInfoDialog({ tgoId: props.tgo.id });
             }
           },
           contextmenu: () => {
-            if (props.tgo.destination) {
+            if (props.hasDestination) {
               cancelTravel({ tgoId: props.tgo.id }).then(() => {
                 resetDestination();
               });
@@ -180,7 +179,7 @@ function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
             pathRef.current?.setDestination(destination);
           },
           dragend: async (event) => {
-            const hadDestination = hasDestination;
+            const hadDestination = props.hasDestination;
             const currentPosition = new LatLng(position.lat, position.lng);
             const destination = event.target.getLatLng();
             setDestination(destination);
@@ -207,8 +206,13 @@ function PrimaryMobileTgo(props: PrimaryMobileTgoProps) {
   );
 }
 
-function SecondaryMobileTgo(props: PrimaryMobileTgoProps) {
-  if (!props.tgo.destination) {
+interface SecondaryMobileTgoProps {
+  tgo: TgoModel;
+  hasDestination: boolean;
+}
+
+function SecondaryMobileTgo(props: SecondaryMobileTgoProps) {
+  if (!props.hasDestination) {
     return <></>;
   }
   return <StaticTgo tgo={props.tgo} />;
@@ -222,10 +226,27 @@ export default function Tgo(props: TgoProps) {
   if (!props.tgo.mobile) {
     return <StaticTgo tgo={props.tgo} />;
   }
+  return <MobileTgo tgo={props.tgo} />;
+}
+
+function MobileTgo(props: TgoProps) {
+  const [hasDestination, setHasDestination] = useState<boolean>(
+    props.tgo.destination != null
+  );
+
+  useEffect(() => {
+    setHasDestination(props.tgo.destination != null);
+  }, [props.tgo.destination]);
+
   return (
     <>
-      <PrimaryMobileTgo tgo={props.tgo} key={props.tgo.destination ? 0 : 1} />
-      <SecondaryMobileTgo tgo={props.tgo} />
+      <PrimaryMobileTgo
+        tgo={props.tgo}
+        hasDestination={hasDestination}
+        setHasDestination={setHasDestination}
+        key={props.tgo.destination ? 0 : 1}
+      />
+      <SecondaryMobileTgo tgo={props.tgo} hasDestination={hasDestination} />
     </>
   );
 }
