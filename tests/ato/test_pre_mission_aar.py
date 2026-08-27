@@ -152,15 +152,16 @@ def test_refuel_task_precedes_hold_task() -> None:
     pre_refuel.add_action(
         Hold(lambda: mission_start + timedelta(minutes=15), feet(20000), kph(400))
     )
+    tasks: list[Any] = []
     dcs_waypoint = SimpleNamespace(
-        tasks=[], add_task=lambda task: dcs_waypoint.tasks.append(task)
+        tasks=tasks, add_task=lambda task: tasks.append(task)
     )
-    builder = object.__new__(PreMissionAarBuilder)
+    builder: Any = object.__new__(PreMissionAarBuilder)
     builder.package = SimpleNamespace(has_flight_with_task=lambda task: True)
     builder.waypoint = pre_refuel
     builder.now = mission_start
 
-    builder.add_tasks(dcs_waypoint)
+    builder.add_tasks(cast(Any, dcs_waypoint))
 
     assert [task.id for task in dcs_waypoint.tasks] == [
         "Refueling",
@@ -190,13 +191,14 @@ def test_refuel_and_hold_are_serialized_on_pre_mission_aar_waypoint() -> None:
 
 
 def test_refuel_task_is_added_for_external_tanker_package() -> None:
+    tasks: list[Any] = []
     dcs_waypoint = SimpleNamespace(
-        tasks=[], add_task=lambda task: dcs_waypoint.tasks.append(task)
+        tasks=tasks, add_task=lambda task: tasks.append(task)
     )
     external_tanker_package = SimpleNamespace(
         has_flight_with_task=lambda task: task == FlightType.REFUELING
     )
-    builder = object.__new__(PreMissionAarBuilder)
+    builder: Any = object.__new__(PreMissionAarBuilder)
     builder.package = SimpleNamespace(has_flight_with_task=lambda task: False)
     builder.flight = SimpleNamespace(
         coalition=SimpleNamespace(
@@ -206,7 +208,7 @@ def test_refuel_task_is_added_for_external_tanker_package() -> None:
     builder.waypoint = waypoint("PRE-REFUEL", FlightWaypointType.PRE_MISSION_AAR)
     builder.now = datetime(2026, 8, 21, 12)
 
-    builder.add_tasks(dcs_waypoint)
+    builder.add_tasks(cast(Any, dcs_waypoint))
 
     assert [task.id for task in dcs_waypoint.tasks] == ["Refueling"]
 

@@ -102,7 +102,10 @@ class CasFlightPlan(PatrollingFlightPlan[CasLayout], UiZoneDisplay):
     def pre_refuel_arrival_time(self) -> datetime | None:
         if self.layout.pre_refuel is None:
             return None
-        return self.pre_refuel_push_time - self.pre_refuel_duration
+        push_time = self.pre_refuel_push_time
+        if push_time is None:
+            return None
+        return push_time - self.pre_refuel_duration
 
     def total_time_between_waypoints(
         self, a: FlightWaypoint, b: FlightWaypoint
