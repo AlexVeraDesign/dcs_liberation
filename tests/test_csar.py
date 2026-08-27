@@ -15,6 +15,7 @@ from game.db.gamedb import GameDb
 from game.server.tgos.models import TgoJs
 from game.squadrons.pilot import Pilot, PilotStatus
 from game.squadrons.squadron import Squadron
+from game.sim.gameupdateevents import GameUpdateEvents
 from game.unitmap import FlyingUnit
 from game.utils import meters, nautical_miles
 
@@ -282,6 +283,14 @@ def test_land_csar_target_exposes_planned_movement_on_map() -> None:
     expected = target.next_turn_position.latlng()
     assert tgo.destination.lat == expected.lat
     assert tgo.destination.lng == expected.lng
+
+
+def test_csar_target_can_be_sent_as_map_update() -> None:
+    target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(0, 0), 0, sea=False)
+
+    events = GameUpdateEvents().update_tgo(target)
+
+    assert target in events.updated_tgos
 
 
 def test_sea_csar_target_cannot_plan_movement() -> None:

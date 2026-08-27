@@ -61,7 +61,7 @@ class CsarSurvivor:
         return str(self.squadron)
 
 
-@dataclass
+@dataclass(eq=False)
 class CsarTarget(MissionTarget, SidcDescribable):
     pilot: Pilot
     squadron: Squadron
