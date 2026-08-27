@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 from dcs.mapping import Point
@@ -18,6 +19,9 @@ from game.squadrons.squadron import Squadron
 from game.sim.gameupdateevents import GameUpdateEvents
 from game.unitmap import FlyingUnit
 from game.utils import meters, nautical_miles
+
+if TYPE_CHECKING:
+    from game import Game
 
 
 def point(x: float, y: float) -> Point:
@@ -44,32 +48,48 @@ class FakeTheater:
         return self.sea
 
 
-@dataclass
-class FakeSquadron:
-    name: str = "Fake Squadron"
-    player: bool = True
-    available_pilots: list[Pilot] = field(default_factory=list)
-    location: FakeControlPoint = field(
-        default_factory=lambda: FakeControlPoint("Home", point(0, 0), True)
-    )
+if TYPE_CHECKING:
 
-    def __str__(self) -> str:
-        return self.name
+    class FakeSquadron(Squadron):
+        def __init__(
+            self,
+            name: str = "Fake Squadron",
+            player: bool = True,
+            available_pilots: list[Pilot] | None = None,
+            location: FakeControlPoint | None = None,
+        ) -> None: ...
+
+else:
+
+    @dataclass
+    class FakeSquadron:
+        name: str = "Fake Squadron"
+        player: bool = True
+        available_pilots: list[Pilot] = field(default_factory=list)
+        location: FakeControlPoint = field(
+            default_factory=lambda: FakeControlPoint("Home", point(0, 0), True)
+        )
+
+        def __str__(self) -> str:
+            return self.name
 
 
-def game_with_cps(*cps: FakeControlPoint, sea: bool = False) -> SimpleNamespace:
-    return SimpleNamespace(
-        turn=0,
-        simulation_time=datetime(2026, 8, 23, 12, 0),
-        theater=FakeTheater(list(cps), sea=sea),
-        db=GameDb(),
-        point_in_world=lambda x, y: point(x, y),
-        settings=SimpleNamespace(
-            invulnerable_player_pilots=False,
-            csar_friendly_recovery_radius=20,
-            csar_enemy_capture_radius=20,
-            csar_pickup_radius=300,
-            csar_grouping_radius=10,
+def game_with_cps(*cps: FakeControlPoint, sea: bool = False) -> Game:
+    return cast(
+        "Game",
+        SimpleNamespace(
+            turn=0,
+            simulation_time=datetime(2026, 8, 23, 12, 0),
+            theater=FakeTheater(list(cps), sea=sea),
+            db=GameDb(),
+            point_in_world=lambda x, y: point(x, y),
+            settings=SimpleNamespace(
+                invulnerable_player_pilots=False,
+                csar_friendly_recovery_radius=20,
+                csar_enemy_capture_radius=20,
+                csar_pickup_radius=300,
+                csar_grouping_radius=10,
+            ),
         ),
     )
 
@@ -80,7 +100,33 @@ def flying_unit(pilot: Pilot, squadron: FakeSquadron) -> FlyingUnit:
         unit_type=SimpleNamespace(helicopter=False),
         package=SimpleNamespace(target=SimpleNamespace(position=point(1000, 0))),
     )
-    return FlyingUnit(flight, pilot)
+    return FlyingUnit(cast(Any, flight), pilot)
+
+
+def csar_builder_flight(target: CsarTarget) -> Any:
+    departure = SimpleNamespace(position=point(0, 0))
+    threat_zone = SimpleNamespace(path_threatened=lambda _a, _b: False)
+    doctrine = SimpleNamespace(
+        helicopter=SimpleNamespace(air_assault_nav_altitude=meters(500)),
+        resolve_air_assault_nav_altitude=lambda: meters(500),
+        resolve_combat_altitude=lambda _is_helo: meters(500),
+        resolve_rendezvous_altitude=lambda _is_helo: meters(500),
+    )
+    coalition = SimpleNamespace(
+        doctrine=doctrine,
+        opponent=SimpleNamespace(threat_zone=threat_zone),
+        nav_mesh=SimpleNamespace(shortest_path=lambda a, b: [a, b]),
+        bullseye=SimpleNamespace(position=point(10000, 10000)),
+    )
+    return SimpleNamespace(
+        is_helo=True,
+        squadron=SimpleNamespace(aircraft=SimpleNamespace(cabin_size=6)),
+        departure=departure,
+        arrival=departure,
+        divert=None,
+        coalition=coalition,
+        package=SimpleNamespace(target=target, waypoints=None),
+    )
 
 
 def test_friendly_cp_automatic_recovery() -> None:
@@ -141,7 +187,7 @@ def test_deep_enemy_territory_outside_cp_radii_creates_csar() -> None:
     )
 
     assert target is not None
-    assert pilot.status is PilotStatus.MIA
+    assert pilot.status == PilotStatus.MIA
     assert pilot not in squadron.available_pilots
     assert target in manager.targets
 
@@ -157,7 +203,7 @@ def test_enemy_aircraft_survivor_does_not_create_csar_target() -> None:
     )
 
     assert target is None
-    assert pilot.status is PilotStatus.Dead
+    assert cast(Any, pilot).status is PilotStatus.Dead
     assert manager.targets == []
 
 
@@ -350,7 +396,7 @@ def test_csar_planned_movement_applies_before_automatic_recovery() -> None:
     game = game_with_cps(
         FakeControlPoint("Friendly", point(nautical_miles(2).meters, 0), True)
     )
-    game.settings.csar_friendly_recovery_radius = 0.25
+    cast(Any, game.settings).csar_friendly_recovery_radius = 0.25
     manager = CsarManager()
     target = CsarTarget(pilot, squadron, point(0, 0), 0, sea=False)
     pilot.mark_mia()
@@ -360,7 +406,7 @@ def test_csar_planned_movement_applies_before_automatic_recovery() -> None:
     manager.process_turn(game)
 
     assert pilot.status is PilotStatus.Active
-    assert target not in manager.targets
+    assert all(existing is not target for existing in manager.targets)
 
 
 def test_legacy_csar_target_save_has_no_planned_movement() -> None:
@@ -390,15 +436,16 @@ def test_land_csar_expiration_kills_pilot() -> None:
 
     manager.process_turn(game)
 
-    assert pilot.status is PilotStatus.MIA
+    assert pilot.status == PilotStatus.MIA
     assert target in manager.targets
 
     game.turn = 9
 
     manager.process_turn(game)
 
-    assert pilot.status is PilotStatus.Dead
-    assert target not in manager.targets
+    assert cast(Any, pilot).status is PilotStatus.Dead
+    remaining_targets = cast(Any, manager).targets
+    assert target not in remaining_targets
 
 
 def test_sea_csar_expiration_kills_pilot() -> None:
@@ -435,7 +482,7 @@ def test_mia_pilots_do_not_open_replenishment_slots() -> None:
     mia_pilot = Pilot("MIA Pilot", status=PilotStatus.MIA)
     squadron = object.__new__(Squadron)
     squadron.current_roster = [*active_pilots, mia_pilot]
-    squadron.settings = SimpleNamespace(
+    cast(Any, squadron).settings = SimpleNamespace(
         enable_squadron_pilot_limits=True,
         squadron_pilot_limit=4,
         squadron_replenishment_rate=1,
@@ -502,32 +549,9 @@ def test_csar_target_mission_types() -> None:
 
 
 def test_csar_flight_plan_does_not_require_package_waypoints() -> None:
-    departure = SimpleNamespace(position=point(0, 0))
     target = CsarTarget(Pilot("Pilot"), FakeSquadron(), point(5000, 0), 0, sea=False)
-    threat_zone = SimpleNamespace(path_threatened=lambda _a, _b: False)
-    doctrine = SimpleNamespace(
-        helicopter=SimpleNamespace(air_assault_nav_altitude=meters(500)),
-        resolve_air_assault_nav_altitude=lambda: meters(500),
-        resolve_combat_altitude=lambda _is_helo: meters(500),
-        resolve_rendezvous_altitude=lambda _is_helo: meters(500),
-    )
-    coalition = SimpleNamespace(
-        doctrine=doctrine,
-        opponent=SimpleNamespace(threat_zone=threat_zone),
-        nav_mesh=SimpleNamespace(shortest_path=lambda a, b: [a, b]),
-        bullseye=SimpleNamespace(position=point(10000, 10000)),
-    )
-    flight = SimpleNamespace(
-        is_helo=True,
-        squadron=SimpleNamespace(aircraft=SimpleNamespace(cabin_size=6)),
-        departure=departure,
-        arrival=departure,
-        divert=None,
-        coalition=coalition,
-        package=SimpleNamespace(target=target, waypoints=None),
-    )
 
-    layout = CsarBuilder(flight).layout()
+    layout = CsarBuilder(csar_builder_flight(target)).layout()
 
     assert layout.pickup.position == target.position
     assert layout.ingress.position.distance_to_point(target.position) == 2000

@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import Any, cast
 
 from dcs.task import OptFormation
 
@@ -7,9 +8,11 @@ from game.flightplan.waypointoptions.formation import Formation
 
 
 def test_flying_unit_hit_point_update_can_be_counted_dead() -> None:
-    unit = SimpleNamespace(flight=SimpleNamespace(departure=SimpleNamespace(captured=True)))
+    unit = SimpleNamespace(
+        flight=SimpleNamespace(departure=SimpleNamespace(captured=True))
+    )
 
-    update = FlyingUnitHitPointUpdate(unit, 1)
+    update = FlyingUnitHitPointUpdate(cast(Any, unit), 1)
 
     assert update.is_dead()
 
