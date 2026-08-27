@@ -48,13 +48,13 @@ def test_pilot_not_on_leave(pilot: Pilot) -> None:
 def test_pilot_dead(pilot: Pilot) -> None:
     pilot.kill()
     assert pilot.status == PilotStatus.Dead
-    assert pilot.alive == False  # type: ignore
+    assert pilot.alive == False
 
 
 def test_mia_pilot_unavailable(pilot: Pilot) -> None:
     pilot.mark_mia()
     assert pilot.status == PilotStatus.MIA
-    assert pilot.alive == False  # type: ignore
+    assert pilot.alive == False
     assert pilot.mia == True
 
 
